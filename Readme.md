@@ -1,3 +1,9 @@
+# Install
+You can install all containers by the below command
+```
+make horizon
+```
+
 # Horizon As a central queue manager
 
 Imagine that we have several microservices and one Redis server to handle queues, in this case, we can use Laravel Horizon as the central queue manager for all of the queues of all microservices.
