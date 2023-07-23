@@ -1,0 +1,131 @@
+version: "3.9"
+
+networks:
+    horizon-network:
+        name: horizon-network
+        driver: bridge
+        ipam:
+            config:
+                -   subnet: 170.18.0.0/16
+                    gateway: 170.18.0.1
+
+services:
+
+    first-app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: first-app
+        working_dir: /var/www/html/laravel
+        stdin_open: true
+        tty: true
+        ports:
+        - 8021:8000
+        environment:
+            REDIS_HOST: horizon-redis-server
+            REDIS_PORT: 6380
+        networks:
+        - horizon-network
+
+    second-app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: second-app
+        working_dir: /var/www/html/laravel
+        stdin_open: true
+        tty: true
+        ports:
+        - 8022:8000
+        environment:
+            REDIS_HOST: horizon-redis-server
+            REDIS_PORT: 6380
+        networks:
+        - horizon-network
+
+    third-app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: third-app
+        working_dir: /var/www/html/laravel
+        stdin_open: true
+        tty: true
+        ports:
+        - 8023:8000
+        environment:
+            REDIS_HOST: horizon-redis-server
+            REDIS_PORT: 6380
+        networks:
+        - horizon-network
+
+    horizon-redis-server:
+        image: redis:7-alpine
+        container_name: horizon-redis-server
+        restart: always
+        ports:
+            - "6380:6379"
+        command: redis-server --save 20 1 --loglevel warning
+        networks:
+            - horizon-network
+
+    horizon-php:
+        build:
+            args:
+                user: horizon
+                uid: 1000
+            context: ./images/php
+            dockerfile: Dockerfile
+        image: horizon-php81
+        container_name: horizon-php
+        restart: unless-stopped
+        working_dir: /application
+        tty: true
+        volumes:
+            - ./../:/application
+            - ./images/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+        networks:
+            - horizon-network
+
+    horizon-webserver:
+        image: nginx:1.25-alpine
+        container_name: horizon-webserver
+        build:
+            context: .
+            dockerfile: Dockerfile
+        working_dir: /application
+        tty: true
+        stdin_open: true
+        restart: unless-stopped
+        volumes:
+            - ./../:/application/
+            - ./images/nginx/default.conf:/etc/nginx/conf.d/default.conf
+            - ./images/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+        ports:
+            - "8020:8000"
+        environment:
+            DB_HOST: 170.18.0.1
+            REDIS_HOST: horizon-redis-server
+            REDIS_PORT: 6380
+        depends_on:
+            - horizon-redis-server
+        networks:
+            - horizon-network
+
+    # horizon-queue-worker:
+    #     container_name: horizon-worker
+    #     build:
+    #         context: .
+    #         dockerfile: Dockerfile
+    #     working_dir: /application
+    #     command: 'php artisan horizon'
+    #     tty: true
+    #     stdin_open: true
+    #     restart: unless-stopped
+    #     volumes:
+    #         - ./../:/application
+    #     environment:
+    #         REDIS_HOST: horizon-redis-server
+    #         REDIS_PORT: 6380
+    #     networks:
+    #         - application
